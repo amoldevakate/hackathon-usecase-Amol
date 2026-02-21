@@ -24,6 +24,7 @@ resource "google_container_cluster" "primary" {
   name     = var.cluster_name
   project  = var.project_id
   location = var.region
+  deletion_protection = false
 
   # Remove default node pool and create a separate one
   remove_default_node_pool = true
