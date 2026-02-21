@@ -104,7 +104,7 @@ variable "machine_type" {
 variable "disk_size_gb" {
   description = "Disk size in GB for each node"
   type        = number
-  default     = 100
+  default     = 30
 }
 
 variable "node_service_account" {
