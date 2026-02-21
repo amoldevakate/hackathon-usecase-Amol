@@ -8,6 +8,8 @@ metadata:
     app: order-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: order-service
@@ -19,6 +21,7 @@ spec:
       containers:
       - name: order-service
         image: asia-south1-docker.pkg.dev/PROJECT_ID/hackathon-repo/order-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         resources:
