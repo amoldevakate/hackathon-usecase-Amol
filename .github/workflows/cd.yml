@@ -14,6 +14,7 @@ env:
   GKE_CLUSTER_NAME: hcltech-gke-cluster
   GKE_ZONE: asia-south1-a
   NAMESPACE: healthcare-app
+  USE_GKE_GCLOUD_AUTH_PLUGIN: True
 
 jobs:
   # -----------------------------------------------------------------------
@@ -26,7 +27,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,6 +41,9 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
 
       - name: Get GKE credentials
         run: |
@@ -92,9 +95,9 @@ jobs:
               -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             if [ -n "$EXTERNAL_IP" ]; then
               echo "Ingress External IP: $EXTERNAL_IP"
-              echo "patient-service:     http://$EXTERNAL_IP/patients"
+              echo "patient-service: http://$EXTERNAL_IP/patients"
               echo "application-service: http://$EXTERNAL_IP/appointments"
-              echo "order-service:       http://$EXTERNAL_IP/orders"
+              echo "order-service: http://$EXTERNAL_IP/orders"
               break
             fi
             echo "Attempt $i: IP not yet assigned, waiting 10s..."
