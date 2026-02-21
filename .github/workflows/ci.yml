@@ -23,10 +23,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -45,23 +41,26 @@ jobs:
           cache-to: type=gha,mode=max,scope=patient-service
 
       - name: Authenticate to Google Cloud
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Configure Docker for GAR
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
       - name: Push image to GAR
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: ./patient-service
           file: ./patient-service/Dockerfile
           push: true
-          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/patient-service:${{ env.IMAGE_TAG }},${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/patient-service:latest
+          tags: |
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/patient-service:${{ env.IMAGE_TAG }}
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/patient-service:latest
           cache-from: type=gha,scope=patient-service
 
   build-application-service:
@@ -70,10 +69,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -92,23 +87,26 @@ jobs:
           cache-to: type=gha,mode=max,scope=application-service
 
       - name: Authenticate to Google Cloud
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Configure Docker for GAR
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
       - name: Push image to GAR
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: ./application-service
           file: ./application-service/Dockerfile
           push: true
-          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/application-service:${{ env.IMAGE_TAG }},${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/application-service:latest
+          tags: |
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/application-service:${{ env.IMAGE_TAG }}
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/application-service:latest
           cache-from: type=gha,scope=application-service
 
   build-order-service:
@@ -117,10 +115,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -146,23 +140,26 @@ jobs:
           cache-to: type=gha,mode=max,scope=order-service
 
       - name: Authenticate to Google Cloud
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Configure Docker for GAR
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
       - name: Push image to GAR
-        if: env.GCP_SA_KEY != '' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: ./order-service
           file: ./order-service/Dockerfile
           push: true
-          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/order-service:${{ env.IMAGE_TAG }},${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/order-service:latest
+          tags: |
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/order-service:${{ env.IMAGE_TAG }}
+            ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/order-service:latest
           cache-from: type=gha,scope=order-service
 
   ci-summary:
@@ -176,9 +173,9 @@ jobs:
     steps:
       - name: Report build status
         run: |
-          echo "patient-service:     ${{ needs.build-patient-service.result }}"
+          echo "patient-service: ${{ needs.build-patient-service.result }}"
           echo "application-service: ${{ needs.build-application-service.result }}"
-          echo "order-service:       ${{ needs.build-order-service.result }}"
+          echo "order-service: ${{ needs.build-order-service.result }}"
           echo "Commit SHA: ${{ github.sha }}"
           if [ "${{ needs.build-patient-service.result }}" != "success" ] || \
              [ "${{ needs.build-application-service.result }}" != "success" ] || \
