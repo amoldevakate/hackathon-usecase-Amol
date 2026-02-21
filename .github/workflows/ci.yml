@@ -66,8 +66,9 @@ jobs:
             -out=tfplan \
             -input=false
 
-    - name: Untaint GKE Cluster (if tainted from previous run)
-      run: terraform untaint module.gke.google_container_cluster.primary || true
+      - name: Untaint GKE Cluster (if tainted from previous run)
+        run: terraform untaint module.gke.google_container_cluster.primary || true
+
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false tfplan
 
@@ -254,9 +255,9 @@ jobs:
     steps:
       - name: Report build status
         run: |
-          echo "patient-service:     ${{ needs.build-patient-service.result }}"
+          echo "patient-service: ${{ needs.build-patient-service.result }}"
           echo "application-service: ${{ needs.build-application-service.result }}"
-          echo "order-service:       ${{ needs.build-order-service.result }}"
+          echo "order-service: ${{ needs.build-order-service.result }}"
           echo "Commit SHA: ${{ github.sha }}"
           if [ "${{ needs.build-patient-service.result }}" != "success" ] || \
              [ "${{ needs.build-application-service.result }}" != "success" ] || \
