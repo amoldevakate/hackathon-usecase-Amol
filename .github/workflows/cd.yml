@@ -94,9 +94,9 @@ jobs:
 
       - name: Wait for rollouts to complete
         run: |
-          kubectl rollout status deployment/patient-service -n ${{ env.NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/application-service -n ${{ env.NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/order-service -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/patient-service -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/application-service -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/order-service -n ${{ env.NAMESPACE }} --timeout=600s
 
       - name: Get Ingress external IP
         run: |
@@ -107,9 +107,9 @@ jobs:
             if [ -n "$EXTERNAL_IP" ]; then
               echo "============================================"
               echo "Ingress External IP: $EXTERNAL_IP"
-              echo "patient-service:      http://$EXTERNAL_IP/patients"
-              echo "application-service:  http://$EXTERNAL_IP/appointments"
-              echo "order-service:        http://$EXTERNAL_IP/orders"
+              echo "patient-service:     http://$EXTERNAL_IP/patients"
+              echo "application-service: http://$EXTERNAL_IP/appointments"
+              echo "order-service:       http://$EXTERNAL_IP/orders"
               echo "============================================"
               break
             fi
