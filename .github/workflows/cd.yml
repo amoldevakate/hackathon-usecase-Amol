@@ -60,16 +60,19 @@ jobs:
       - name: Apply Kubernetes Namespace
         run: kubectl apply -f k8s/namespace.yaml
 
-      - name: Update image tags in manifests
+      - name: Update PROJECT_ID and image tags in manifests
         run: |
           SHA="${{ steps.image-tag.outputs.sha }}"
           PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          # Replace PROJECT_ID placeholder
           sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/patient-service.yaml
           sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/application-service.yaml
           sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/order-service.yaml
-          sed -i "s|:latest|:${SHA}|g" k8s/patient-service.yaml
-          sed -i "s|:latest|:${SHA}|g" k8s/application-service.yaml
-          sed -i "s|:latest|:${SHA}|g" k8s/order-service.yaml
+          # Keep :latest tag (do NOT replace with SHA)
+          echo "Using latest images from GAR"
+          cat k8s/patient-service.yaml | grep image
+          cat k8s/application-service.yaml | grep image
+          cat k8s/order-service.yaml | grep image
 
       - name: Deploy patient-service
         run: kubectl apply -f k8s/patient-service.yaml
@@ -82,6 +85,12 @@ jobs:
 
       - name: Apply Ingress
         run: kubectl apply -f k8s/ingress.yaml
+
+      - name: Force rollout restart to pull latest images
+        run: |
+          kubectl rollout restart deployment/patient-service -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/application-service -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/order-service -n ${{ env.NAMESPACE }}
 
       - name: Wait for rollouts to complete
         run: |
