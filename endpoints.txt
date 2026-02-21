@@ -1,0 +1,10 @@
+# Application Service (Appointments)
+curl http://localhost:3001/health
+curl http://localhost:3001/appointments
+
+# Patient Service
+curl http://localhost:3000/health
+curl http://localhost:3000/patients
+
+# Order Service
+curl http://localhost:8080/orders
