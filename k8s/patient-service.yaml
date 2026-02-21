@@ -1,0 +1,59 @@
+# patient-service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  namespace: healthcare-app
+  labels:
+    app: patient-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: patient-service
+  template:
+    metadata:
+      labels:
+        app: patient-service
+    spec:
+      containers:
+      - name: patient-service
+        image: asia-south1-docker.pkg.dev/PROJECT_ID/hackathon-repo/patient-service:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+# patient-service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  namespace: healthcare-app
+  labels:
+    app: patient-service
+spec:
+  selector:
+    app: patient-service
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: ClusterIP
