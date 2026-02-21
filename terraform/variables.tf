@@ -188,3 +188,23 @@ variable "common_labels" {
     managed_by  = "terraform"
   }
 }
+# -----------------------------------------------------------------------
+# Artifact Registry Variables
+# -----------------------------------------------------------------------
+variable "gar_repository_id" {
+  description = "The ID of the Artifact Registry Docker repository"
+  type        = string
+  default     = "hackathon-repo"
+}
+
+variable "gar_description" {
+  description = "Description of the Artifact Registry repository"
+  type        = string
+  default     = "Docker repository for hackathon microservices (patient, application, order services)"
+}
+
+variable "gar_pusher_sa_email" {
+  description = "Service account email that pushes images (GitHub Actions / CI-CD SA)"
+  type        = string
+  default     = "terraform-sa@hcltech-prod.iam.gserviceaccount.com"
+}
