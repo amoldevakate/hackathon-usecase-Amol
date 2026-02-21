@@ -85,3 +85,19 @@ output "gke_node_pool_name" {
   description = "Name of the GKE node pool"
   value       = module.gke.node_pool_name
 }
+
+# ------- Artifact Registry Outputs -------
+output "gar_repository_url" {
+  description = "Full URL for pushing/pulling Docker images to GAR"
+  value       = module.gar.repository_url
+}
+
+output "gar_repository_id" {
+  description = "ID of the Artifact Registry repository"
+  value       = module.gar.repository_id
+}
+
+output "gar_location" {
+  description = "Location of the Artifact Registry repository"
+  value       = module.gar.location
+}
