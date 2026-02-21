@@ -58,6 +58,9 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Untaint GKE Cluster (if tainted from previous run)
+        run: terraform untaint module.gke.google_container_cluster.primary || true
+
       - name: Terraform Plan
         run: |
           terraform plan \
@@ -65,9 +68,6 @@ jobs:
             -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
             -out=tfplan \
             -input=false
-
-      - name: Untaint GKE Cluster (if tainted from previous run)
-        run: terraform untaint module.gke.google_container_cluster.primary || true
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false tfplan
