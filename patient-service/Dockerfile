@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Using npm install (not npm ci) as package-lock.json may not exist
+RUN npm install --only=production && npm cache clean --force
 
 # ==============================================
 # Stage 2: Final production image
