@@ -15,6 +15,8 @@ env:
   GAR_REPOSITORY: hackathon-repo
   IMAGE_TAG: ${{ github.sha }}
   TF_VERSION: '1.7.5'
+  GKE_CLUSTER_NAME: hcltech-gke-cluster
+  GKE_ZONE: asia-south1-a
 
 jobs:
   # -----------------------------------------------------------------------
@@ -46,6 +48,18 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+      - name: Delete Old GKE Cluster (free up SSD quota)
+        working-directory: .
+        run: |
+          gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --zone=asia-south1 \
+            --quiet 2>/dev/null || \
+          gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --zone=${{ env.GKE_ZONE }} \
+            --quiet 2>/dev/null || \
+          echo "Cluster not found or already deleted"
       - name: Terraform Init
         run: |
           terraform init \
