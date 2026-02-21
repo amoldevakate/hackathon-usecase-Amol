@@ -48,7 +48,7 @@ module "gke" {
   project_id           = var.project_id
   region               = var.region
   cluster_name         = var.gke_cluster_name
-  network              = module.vpc.network_name
+  network              = module.vpc.vpc_name
   subnetwork           = module.vpc.private_subnet_name
   node_service_account = var.node_service_account
 
