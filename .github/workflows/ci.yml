@@ -38,59 +38,84 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
-      - name: Delete Existing GKE Cluster (all locations)
-        working-directory: .
-        run: |
-          echo "Attempting to delete cluster in asia-south1-a..."
-          gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --zone=${{ env.GKE_ZONE }} \
-            --quiet && echo "Deleted from asia-south1-a" || echo "Not found in asia-south1-a"
-          echo "Attempting to delete cluster in asia-south1 (regional)..."
-          gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --region=asia-south1 \
-            --quiet && echo "Deleted from asia-south1" || echo "Not found in asia-south1"
-          echo "Cluster cleanup complete"
+
       - name: Terraform Init
         run: |
           terraform init \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
             -backend-config="prefix=terraform/state"
+
       - name: Terraform Validate
         run: terraform validate
+
       - name: Delete Stale GCS Lock File
         run: gsutil rm gs://${{ secrets.TF_STATE_BUCKET }}/terraform/state/default.tflock 2>/dev/null || echo "No lock file to delete"
-      - name: Remove GKE Cluster from Terraform State
-        run: |
-          terraform state rm module.gke.google_container_node_pool.primary_nodes 2>/dev/null || true
-          terraform state rm module.gke.google_container_cluster.primary 2>/dev/null || true
-          echo "State cleanup complete"
+
       - name: Terraform Plan
+        id: tf-plan
         run: |
           terraform plan \
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
             -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
             -out=tfplan \
             -input=false \
-            -lock=false
+            -lock=false \
+            -detailed-exitcode 2>&1 | tee plan_output.txt
+          echo "exitcode=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check if replace needed and delete cluster
+        working-directory: .
+        run: |
+          PLAN_OUTPUT=$(cat terraform/plan_output.txt)
+          if echo "$PLAN_OUTPUT" | grep -q "must be replaced\|forces replacement"; then
+            echo "Cluster replacement needed - deleting existing cluster first..."
+            gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
+              --project=${{ secrets.GCP_PROJECT_ID }} \
+              --zone=${{ env.GKE_ZONE }} \
+              --quiet 2>/dev/null && echo "Deleted from asia-south1-a" || echo "Not found in asia-south1-a"
+            gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
+              --project=${{ secrets.GCP_PROJECT_ID }} \
+              --region=asia-south1 \
+              --quiet 2>/dev/null && echo "Deleted from asia-south1" || echo "Not found in asia-south1"
+            echo "Removing from Terraform state..."
+            cd terraform
+            terraform state rm module.gke.google_container_node_pool.primary_nodes 2>/dev/null || true
+            terraform state rm module.gke.google_container_cluster.primary 2>/dev/null || true
+            cd ..
+            echo "Re-running plan after state cleanup..."
+            cd terraform
+            terraform plan \
+              -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+              -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
+              -out=tfplan \
+              -input=false \
+              -lock=false
+          else
+            echo "No replacement needed - using existing plan"
+          fi
+
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false -lock=false tfplan
+
       - name: Get Terraform Outputs
         id: tf-output
         run: |
           GAR_URL=$(terraform output -raw gar_repository_url)
           echo "gar_repository_url=$GAR_URL" >> $GITHUB_OUTPUT
+
   # -----------------------------------------------------------------------
   # Job 2: Build patient-service
   # -----------------------------------------------------------------------
@@ -104,8 +129,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image (PR / feature branch)
         if: github.ref != 'refs/heads/main'
         uses: docker/build-push-action@v5
@@ -116,15 +143,18 @@ jobs:
           tags: patient-service:${{ env.IMAGE_TAG }}
           cache-from: type=gha,scope=patient-service
           cache-to: type=gha,mode=max,scope=patient-service
+
       - name: Authenticate to Google Cloud
         if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
       - name: Configure Docker for GAR
         if: github.ref == 'refs/heads/main'
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
+
       - name: Build & Push image to GAR
         if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
@@ -137,6 +167,7 @@ jobs:
             ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/patient-service:latest
           cache-from: type=gha,scope=patient-service
           cache-to: type=gha,mode=max,scope=patient-service
+
   # -----------------------------------------------------------------------
   # Job 3: Build application-service
   # -----------------------------------------------------------------------
@@ -150,8 +181,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image (PR / feature branch)
         if: github.ref != 'refs/heads/main'
         uses: docker/build-push-action@v5
@@ -162,15 +195,18 @@ jobs:
           tags: application-service:${{ env.IMAGE_TAG }}
           cache-from: type=gha,scope=application-service
           cache-to: type=gha,mode=max,scope=application-service
+
       - name: Authenticate to Google Cloud
         if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
       - name: Configure Docker for GAR
         if: github.ref == 'refs/heads/main'
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
+
       - name: Build & Push image to GAR
         if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
@@ -183,6 +219,7 @@ jobs:
             ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/application-service:latest
           cache-from: type=gha,scope=application-service
           cache-to: type=gha,mode=max,scope=application-service
+
   # -----------------------------------------------------------------------
   # Job 4: Build order-service
   # -----------------------------------------------------------------------
@@ -196,14 +233,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('order-service/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
+
       - name: Build Docker image (PR / feature branch)
         if: github.ref != 'refs/heads/main'
         uses: docker/build-push-action@v5
@@ -214,15 +254,18 @@ jobs:
           tags: order-service:${{ env.IMAGE_TAG }}
           cache-from: type=gha,scope=order-service
           cache-to: type=gha,mode=max,scope=order-service
+
       - name: Authenticate to Google Cloud
         if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
       - name: Configure Docker for GAR
         if: github.ref == 'refs/heads/main'
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
+
       - name: Build & Push image to GAR
         if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
@@ -235,6 +278,7 @@ jobs:
             ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/order-service:latest
           cache-from: type=gha,scope=order-service
           cache-to: type=gha,mode=max,scope=order-service
+
   # -----------------------------------------------------------------------
   # Job 5: CI Summary
   # -----------------------------------------------------------------------
