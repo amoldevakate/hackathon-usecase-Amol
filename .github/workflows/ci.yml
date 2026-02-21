@@ -48,18 +48,20 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
-      - name: Delete Old GKE Cluster (free up SSD quota)
+      - name: Delete Existing GKE Cluster (all locations)
         working-directory: .
         run: |
-          gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --zone=asia-south1 \
-            --quiet 2>/dev/null || \
+          echo "Attempting to delete cluster in asia-south1-a..."
           gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
             --project=${{ secrets.GCP_PROJECT_ID }} \
             --zone=${{ env.GKE_ZONE }} \
-            --quiet 2>/dev/null || \
-          echo "Cluster not found or already deleted"
+            --quiet && echo "Deleted from asia-south1-a" || echo "Not found in asia-south1-a"
+          echo "Attempting to delete cluster in asia-south1 (regional)..."
+          gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --region=asia-south1 \
+            --quiet && echo "Deleted from asia-south1" || echo "Not found in asia-south1"
+          echo "Cluster cleanup complete"
       - name: Terraform Init
         run: |
           terraform init \
@@ -71,8 +73,9 @@ jobs:
         run: gsutil rm gs://${{ secrets.TF_STATE_BUCKET }}/terraform/state/default.tflock 2>/dev/null || echo "No lock file to delete"
       - name: Remove GKE Cluster from Terraform State
         run: |
-          terraform state rm module.gke.google_container_node_pool.primary_nodes || true
-          terraform state rm module.gke.google_container_cluster.primary || true
+          terraform state rm module.gke.google_container_node_pool.primary_nodes 2>/dev/null || true
+          terraform state rm module.gke.google_container_cluster.primary 2>/dev/null || true
+          echo "State cleanup complete"
       - name: Terraform Plan
         run: |
           terraform plan \
