@@ -95,7 +95,7 @@ resource "google_container_cluster" "primary" {
     recurring_window {
       start_time = "2024-01-01T02:00:00Z"
       end_time   = "2024-01-01T06:00:00Z"
-      recurrence = "FREQ=WEEKLY;BYDAY=SA,SU"
+      recurrence = "FREQ=DAILY"
     }
   }
 
