@@ -66,6 +66,8 @@ jobs:
             -out=tfplan \
             -input=false
 
+    - name: Untaint GKE Cluster (if tainted from previous run)
+      run: terraform untaint module.gke.google_container_cluster.primary || true
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false tfplan
 
