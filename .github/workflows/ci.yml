@@ -62,15 +62,7 @@ jobs:
         run: terraform untaint module.gke.google_container_cluster.primary || true
 
       - name: Force Unlock Terraform State (if locked)
-        run: |
-          # Get lock ID from state if it exists and force unlock
-          LOCK_ID=$(gsutil cat gs://${{ secrets.TF_STATE_BUCKET }}/terraform/state/default.tflock 2>/dev/null | python3 -c "import sys,json; data=json.load(sys.stdin); print(data.get('ID',''))" 2>/dev/null || echo "")
-          if [ -n "$LOCK_ID" ]; then
-            echo "Found stale lock ID: $LOCK_ID - force unlocking..."
-            terraform force-unlock -force "$LOCK_ID" || true
-          else
-            echo "No stale lock found, proceeding normally"
-          fi
+        run: terraform force-unlock -force 1771667103178574 || true
 
       - name: Terraform Plan
         run: |
