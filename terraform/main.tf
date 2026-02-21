@@ -69,3 +69,19 @@ module "gke" {
 
   depends_on = [module.vpc]
 }
+
+# -----------------------------------------------------------------------
+# Artifact Registry Module
+# Creates: hackathon-repo Docker registry in asia-south1
+# -----------------------------------------------------------------------
+module "gar" {
+  source = "./modules/gar"
+
+  project_id                   = var.project_id
+  location                     = var.region
+  repository_id                = var.gar_repository_id
+  description                  = var.gar_description
+  pusher_service_account_email = var.gar_pusher_sa_email
+  puller_service_account_email = var.node_service_account
+  labels                       = var.common_labels
+}
