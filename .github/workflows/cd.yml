@@ -55,21 +55,28 @@ jobs:
 
       - name: Set image tag
         id: image-tag
-        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Apply Kubernetes Namespace
         run: kubectl apply -f k8s/namespace.yaml
 
-      - name: Update PROJECT_ID and image tags in manifests
+      - name: Update PROJECT_ID in manifests
         run: |
-          SHA="${{ steps.image-tag.outputs.sha }}"
           PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          SHORT_SHA="${{ steps.image-tag.outputs.short_sha }}"
           # Replace PROJECT_ID placeholder
           sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/patient-service.yaml
           sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/application-service.yaml
           sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/order-service.yaml
-          # Keep :latest tag (do NOT replace with SHA)
-          echo "Using latest images from GAR"
+          # Replace :latest with actual SHA tag
+          sed -i "s|:latest|:${SHORT_SHA}|g" k8s/patient-service.yaml
+          sed -i "s|:latest|:${SHORT_SHA}|g" k8s/application-service.yaml
+          sed -i "s|:latest|:${SHORT_SHA}|g" k8s/order-service.yaml
+          echo "=== Using SHA tag: ${SHORT_SHA} ==="
           cat k8s/patient-service.yaml | grep image
           cat k8s/application-service.yaml | grep image
           cat k8s/order-service.yaml | grep image
@@ -86,16 +93,16 @@ jobs:
       - name: Apply Ingress
         run: kubectl apply -f k8s/ingress.yaml
 
-      - name: Force rollout restart to pull latest images
-        run: |
-          kubectl rollout restart deployment/patient-service -n ${{ env.NAMESPACE }}
-          kubectl rollout restart deployment/application-service -n ${{ env.NAMESPACE }}
-          kubectl rollout restart deployment/order-service -n ${{ env.NAMESPACE }}
-
-      - name: Wait for rollouts to complete
+      - name: Wait for patient-service rollout
         run: |
           kubectl rollout status deployment/patient-service -n ${{ env.NAMESPACE }} --timeout=600s
+
+      - name: Wait for application-service rollout
+        run: |
           kubectl rollout status deployment/application-service -n ${{ env.NAMESPACE }} --timeout=600s
+
+      - name: Wait for order-service rollout
+        run: |
           kubectl rollout status deployment/order-service -n ${{ env.NAMESPACE }} --timeout=600s
 
       - name: Get Ingress external IP
