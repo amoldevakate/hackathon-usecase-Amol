@@ -40,34 +40,32 @@ module "gcs" {
 
 # -----------------------------------------------------------------------
 # GKE Cluster Module
-# Creates: Private GKE cluster with autoscaling node pool
+# Creates: Zonal GKE cluster (asia-south1-a) - single node e2-medium
+# Using zone (not region) to avoid 3x node multiplication
 # -----------------------------------------------------------------------
 module "gke" {
   source = "./modules/gke"
 
-  project_id           = var.project_id
-  region               = var.region
-  cluster_name         = var.gke_cluster_name
-  network              = module.vpc.vpc_name
-  subnetwork           = module.vpc.private_subnet_name
-  node_service_account = var.node_service_account
-
-  master_ipv4_cidr_block         = var.master_ipv4_cidr_block
-  cluster_secondary_range_name   = var.cluster_secondary_range_name
-  services_secondary_range_name  = var.services_secondary_range_name
-  master_authorized_networks     = var.master_authorized_networks
-  release_channel                = var.gke_release_channel
-
-  node_pool_name  = var.node_pool_name
-  node_count      = var.node_count
-  min_node_count  = var.min_node_count
-  max_node_count  = var.max_node_count
-  machine_type    = var.machine_type
-  disk_size_gb    = var.disk_size_gb
-  node_tags       = var.node_tags
-  labels          = var.common_labels
-
-  depends_on = [module.vpc]
+  project_id                    = var.project_id
+  region                        = "asia-south1-a"
+  cluster_name                  = var.gke_cluster_name
+  network                       = module.vpc.vpc_name
+  subnetwork                    = module.vpc.private_subnet_name
+  node_service_account          = var.node_service_account
+  master_ipv4_cidr_block        = var.master_ipv4_cidr_block
+  cluster_secondary_range_name  = var.cluster_secondary_range_name
+  services_secondary_range_name = var.services_secondary_range_name
+  master_authorized_networks    = var.master_authorized_networks
+  release_channel               = var.gke_release_channel
+  node_pool_name                = var.node_pool_name
+  node_count                    = 1
+  min_node_count                = 1
+  max_node_count                = 2
+  machine_type                  = "e2-medium"
+  disk_size_gb                  = 30
+  node_tags                     = var.node_tags
+  labels                        = var.common_labels
+  depends_on                    = [module.vpc]
 }
 
 # -----------------------------------------------------------------------
