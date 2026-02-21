@@ -1,0 +1,111 @@
+name: CD - Deploy to GKE
+
+on:
+  workflow_run:
+    workflows: ["CI - Build, Provision & Push Docker Images"]
+    types:
+      - completed
+    branches:
+      - main
+
+env:
+  GAR_LOCATION: asia-south1
+  GAR_REPOSITORY: hackathon-repo
+  GKE_CLUSTER_NAME: hcltech-gke-cluster
+  GKE_ZONE: asia-south1-a
+  NAMESPACE: healthcare-app
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Deploy to GKE - only runs when CI workflow succeeds
+  # -----------------------------------------------------------------------
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER_NAME }} \
+            --zone ${{ env.GKE_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set image tag
+        id: image-tag
+        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+
+      - name: Apply Kubernetes Namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
+      - name: Update image tags in manifests
+        run: |
+          IMAGE_BASE="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}"
+          SHA="${{ steps.image-tag.outputs.sha }}"
+          sed -i "s|PROJECT_ID|${{ secrets.GCP_PROJECT_ID }}|g" k8s/patient-service.yaml
+          sed -i "s|PROJECT_ID|${{ secrets.GCP_PROJECT_ID }}|g" k8s/application-service.yaml
+          sed -i "s|PROJECT_ID|${{ secrets.GCP_PROJECT_ID }}|g" k8s/order-service.yaml
+          sed -i "s|:latest|:${SHA}|g" k8s/patient-service.yaml
+          sed -i "s|:latest|:${SHA}|g" k8s/application-service.yaml
+          sed -i "s|:latest|:${SHA}|g" k8s/order-service.yaml
+
+      - name: Deploy patient-service
+        run: kubectl apply -f k8s/patient-service.yaml
+
+      - name: Deploy application-service
+        run: kubectl apply -f k8s/application-service.yaml
+
+      - name: Deploy order-service
+        run: kubectl apply -f k8s/order-service.yaml
+
+      - name: Apply Ingress
+        run: kubectl apply -f k8s/ingress.yaml
+
+      - name: Wait for rollouts to complete
+        run: |
+          kubectl rollout status deployment/patient-service -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/application-service -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/order-service -n ${{ env.NAMESPACE }} --timeout=300s
+
+      - name: Get Ingress external IP
+        run: |
+          echo "Waiting for Ingress external IP..."
+          for i in {1..30}; do
+            EXTERNAL_IP=$(kubectl get ingress healthcare-ingress -n ${{ env.NAMESPACE }} \
+              -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            if [ -n "$EXTERNAL_IP" ]; then
+              echo "Ingress External IP: $EXTERNAL_IP"
+              echo "patient-service:     http://$EXTERNAL_IP/patients"
+              echo "application-service: http://$EXTERNAL_IP/appointments"
+              echo "order-service:       http://$EXTERNAL_IP/orders"
+              break
+            fi
+            echo "Attempt $i: IP not yet assigned, waiting 10s..."
+            sleep 10
+          done
+
+      - name: Verify deployments
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          echo "=== Services ==="
+          kubectl get services -n ${{ env.NAMESPACE }}
+          echo "=== Ingress ==="
+          kubectl get ingress -n ${{ env.NAMESPACE }}
