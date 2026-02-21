@@ -2,7 +2,7 @@ name: CD - Deploy to GKE
 
 on:
   workflow_run:
-    workflows: ["CI - Build, Provision & Push Docker Images"]
+    workflows: ["CI - Build & Push Docker Images to GAR"]
     types:
       - completed
     branches:
@@ -14,7 +14,7 @@ env:
   GKE_CLUSTER_NAME: hcltech-gke-cluster
   GKE_ZONE: asia-south1-a
   NAMESPACE: healthcare-app
-  USE_GKE_GCLOUD_AUTH_PLUGIN: True
+  USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
 
 jobs:
   # -----------------------------------------------------------------------
@@ -43,7 +43,9 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Install gke-gcloud-auth-plugin
-        run: gcloud components install gke-gcloud-auth-plugin --quiet
+        run: |
+          gcloud components install gke-gcloud-auth-plugin --quiet
+          echo "USE_GKE_GCLOUD_AUTH_PLUGIN=True" >> $GITHUB_ENV
 
       - name: Get GKE credentials
         run: |
@@ -60,11 +62,11 @@ jobs:
 
       - name: Update image tags in manifests
         run: |
-          IMAGE_BASE="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}"
           SHA="${{ steps.image-tag.outputs.sha }}"
-          sed -i "s|PROJECT_ID|${{ secrets.GCP_PROJECT_ID }}|g" k8s/patient-service.yaml
-          sed -i "s|PROJECT_ID|${{ secrets.GCP_PROJECT_ID }}|g" k8s/application-service.yaml
-          sed -i "s|PROJECT_ID|${{ secrets.GCP_PROJECT_ID }}|g" k8s/order-service.yaml
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/patient-service.yaml
+          sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/application-service.yaml
+          sed -i "s|PROJECT_ID|${PROJECT}|g" k8s/order-service.yaml
           sed -i "s|:latest|:${SHA}|g" k8s/patient-service.yaml
           sed -i "s|:latest|:${SHA}|g" k8s/application-service.yaml
           sed -i "s|:latest|:${SHA}|g" k8s/order-service.yaml
@@ -94,13 +96,15 @@ jobs:
             EXTERNAL_IP=$(kubectl get ingress healthcare-ingress -n ${{ env.NAMESPACE }} \
               -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             if [ -n "$EXTERNAL_IP" ]; then
+              echo "============================================"
               echo "Ingress External IP: $EXTERNAL_IP"
-              echo "patient-service: http://$EXTERNAL_IP/patients"
-              echo "application-service: http://$EXTERNAL_IP/appointments"
-              echo "order-service: http://$EXTERNAL_IP/orders"
+              echo "patient-service:      http://$EXTERNAL_IP/patients"
+              echo "application-service:  http://$EXTERNAL_IP/appointments"
+              echo "order-service:        http://$EXTERNAL_IP/orders"
+              echo "============================================"
               break
             fi
-            echo "Attempt $i: IP not yet assigned, waiting 10s..."
+            echo "Attempt $i/30: IP not yet assigned, waiting 10s..."
             sleep 10
           done
 
