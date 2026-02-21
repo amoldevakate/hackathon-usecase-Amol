@@ -1,4 +1,5 @@
 name: CI - Build and Push Docker Images
+# Trigger: fix WIF attribute condition - attribute.repository_owner
 
 on:
   push:
