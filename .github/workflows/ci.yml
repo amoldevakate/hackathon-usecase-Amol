@@ -55,10 +55,10 @@ jobs:
         run: terraform validate
       - name: Delete Stale GCS Lock File
         run: gsutil rm gs://${{ secrets.TF_STATE_BUCKET }}/terraform/state/default.tflock 2>/dev/null || echo "No lock file to delete"
-      - name: Untaint GKE Resources (clear any stale taint)
+      - name: Remove GKE Cluster from Terraform State
         run: |
-          terraform untaint module.gke.google_container_cluster.primary || true
-          terraform untaint module.gke.google_container_node_pool.primary_nodes || true
+          terraform state rm module.gke.google_container_node_pool.primary_nodes || true
+          terraform state rm module.gke.google_container_cluster.primary || true
       - name: Terraform Plan
         run: |
           terraform plan \
