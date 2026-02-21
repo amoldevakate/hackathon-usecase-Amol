@@ -63,3 +63,25 @@ output "bucket_storage_class" {
   description = "Storage class of the GCS bucket"
   value       = module.gcs.bucket_storage_class
 }
+
+# ------ GKE Cluster Outputs ------
+output "gke_cluster_name" {
+  description = "Name of the GKE cluster"
+  value       = module.gke.cluster_name
+}
+
+output "gke_cluster_location" {
+  description = "Location of the GKE cluster"
+  value       = module.gke.cluster_location
+}
+
+output "gke_cluster_endpoint" {
+  description = "Endpoint of the GKE cluster"
+  value       = module.gke.cluster_endpoint
+  sensitive   = true
+}
+
+output "gke_node_pool_name" {
+  description = "Name of the GKE node pool"
+  value       = module.gke.node_pool_name
+}
