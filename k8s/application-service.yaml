@@ -1,0 +1,59 @@
+# application-service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: application-service
+  namespace: healthcare-app
+  labels:
+    app: application-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: application-service
+  template:
+    metadata:
+      labels:
+        app: application-service
+    spec:
+      containers:
+      - name: application-service
+        image: asia-south1-docker.pkg.dev/PROJECT_ID/hackathon-repo/application-service:latest
+        ports:
+        - containerPort: 3001
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+# application-service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: application-service
+  namespace: healthcare-app
+  labels:
+    app: application-service
+spec:
+  selector:
+    app: application-service
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3001
+  type: ClusterIP
