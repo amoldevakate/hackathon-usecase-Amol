@@ -15,11 +15,8 @@ terraform {
     }
   }
 
-  # Uncomment and configure backend when ready to use remote state
-  # backend "gcs" {
-  #   bucket = "hcl-bucket-2026"
-  #   prefix = "terraform/state"
-  # }
+  # GCS backend for remote state - bucket injected via -backend-config in CI
+  backend "gcs" {}
 }
 
 provider "google" {
