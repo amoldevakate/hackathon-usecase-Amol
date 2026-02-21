@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------
 # Root Terraform Configuration
 # Project: hcltech-prod
-# Modules: VPC Network + GCS Bucket
+# Modules: VPC Network + GCS Bucket + GKE Cluster
 # -----------------------------------------------------------------------
 
 # -----------------------------------------------------------------------
@@ -12,13 +12,13 @@
 module "vpc" {
   source = "./modules/vpc"
 
-  project_id           = var.project_id
-  vpc_name             = var.vpc_name
-  public_subnet_name   = var.public_subnet_name
-  private_subnet_name  = var.private_subnet_name
-  public_cidr          = var.public_cidr
-  private_cidr         = var.private_cidr
-  region               = var.region
+  project_id          = var.project_id
+  vpc_name            = var.vpc_name
+  public_subnet_name  = var.public_subnet_name
+  private_subnet_name = var.private_subnet_name
+  public_cidr         = var.public_cidr
+  private_cidr        = var.private_cidr
+  region              = var.region
 }
 
 # -----------------------------------------------------------------------
@@ -36,4 +36,36 @@ module "gcs" {
   force_destroy      = false
   lifecycle_age_days = 30
   labels             = var.bucket_labels
+}
+
+# -----------------------------------------------------------------------
+# GKE Cluster Module
+# Creates: Private GKE cluster with autoscaling node pool
+# -----------------------------------------------------------------------
+module "gke" {
+  source = "./modules/gke"
+
+  project_id           = var.project_id
+  region               = var.region
+  cluster_name         = var.gke_cluster_name
+  network              = module.vpc.network_name
+  subnetwork           = module.vpc.private_subnet_name
+  node_service_account = var.node_service_account
+
+  master_ipv4_cidr_block         = var.master_ipv4_cidr_block
+  cluster_secondary_range_name   = var.cluster_secondary_range_name
+  services_secondary_range_name  = var.services_secondary_range_name
+  master_authorized_networks     = var.master_authorized_networks
+  release_channel                = var.gke_release_channel
+
+  node_pool_name  = var.node_pool_name
+  node_count      = var.node_count
+  min_node_count  = var.min_node_count
+  max_node_count  = var.max_node_count
+  machine_type    = var.machine_type
+  disk_size_gb    = var.disk_size_gb
+  node_tags       = var.node_tags
+  labels          = var.common_labels
+
+  depends_on = [module.vpc]
 }
