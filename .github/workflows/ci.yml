@@ -63,49 +63,38 @@ jobs:
       - name: Delete Stale GCS Lock File
         run: gsutil rm gs://${{ secrets.TF_STATE_BUCKET }}/terraform/state/default.tflock 2>/dev/null || echo "No lock file to delete"
 
+      - name: Import existing GKE resources into Terraform state
+        run: |
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          ZONE="${{ env.GKE_ZONE }}"
+          CLUSTER="${{ env.GKE_CLUSTER_NAME }}"
+          NODE_POOL="hcltech-node-pool"
+          # Check if cluster exists in GCP
+          if gcloud container clusters describe $CLUSTER --zone=$ZONE --project=$PROJECT --format='value(name)' 2>/dev/null | grep -q $CLUSTER; then
+            echo "Cluster exists in GCP - importing into Terraform state..."
+            # Import cluster if not in state
+            terraform state show module.gke.google_container_cluster.primary 2>/dev/null || \
+              terraform import -var="project_id=${PROJECT}" -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
+                module.gke.google_container_cluster.primary \
+                "projects/${PROJECT}/locations/${ZONE}/clusters/${CLUSTER}" 2>/dev/null || echo "Cluster import failed or not needed"
+            # Import node pool if not in state
+            terraform state show module.gke.google_container_node_pool.primary_nodes 2>/dev/null || \
+              terraform import -var="project_id=${PROJECT}" -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
+                module.gke.google_container_node_pool.primary_nodes \
+                "projects/${PROJECT}/locations/${ZONE}/clusters/${CLUSTER}/nodePools/${NODE_POOL}" 2>/dev/null || echo "Node pool import failed or not needed"
+            echo "Import complete"
+          else
+            echo "Cluster does not exist in GCP - Terraform will create it"
+          fi
+
       - name: Terraform Plan
-        id: tf-plan
         run: |
           terraform plan \
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
             -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
             -out=tfplan \
             -input=false \
-            -lock=false \
-            -detailed-exitcode 2>&1 | tee plan_output.txt
-          echo "exitcode=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-        continue-on-error: true
-
-      - name: Check if replace needed and delete cluster
-        working-directory: .
-        run: |
-          PLAN_OUTPUT=$(cat terraform/plan_output.txt)
-          if echo "$PLAN_OUTPUT" | grep -q "must be replaced\|forces replacement"; then
-            echo "Cluster replacement needed - deleting existing cluster first..."
-            gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
-              --project=${{ secrets.GCP_PROJECT_ID }} \
-              --zone=${{ env.GKE_ZONE }} \
-              --quiet 2>/dev/null && echo "Deleted from asia-south1-a" || echo "Not found in asia-south1-a"
-            gcloud container clusters delete ${{ env.GKE_CLUSTER_NAME }} \
-              --project=${{ secrets.GCP_PROJECT_ID }} \
-              --region=asia-south1 \
-              --quiet 2>/dev/null && echo "Deleted from asia-south1" || echo "Not found in asia-south1"
-            echo "Removing from Terraform state..."
-            cd terraform
-            terraform state rm module.gke.google_container_node_pool.primary_nodes 2>/dev/null || true
-            terraform state rm module.gke.google_container_cluster.primary 2>/dev/null || true
-            cd ..
-            echo "Re-running plan after state cleanup..."
-            cd terraform
-            terraform plan \
-              -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-              -var="gar_pusher_sa_email=${{ secrets.GCP_SERVICE_ACCOUNT }}" \
-              -out=tfplan \
-              -input=false \
-              -lock=false
-          else
-            echo "No replacement needed - using existing plan"
-          fi
+            -lock=false
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false -lock=false tfplan
